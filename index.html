@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Controle de treinos na academia" />
+  <meta name="theme-color" content="#7c3aed" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GymTracker" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+
+  <title>GymTracker</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<!-- ─── Login Screen ──────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="logo-icon">🏋️</span>
+      <h1>GymTracker</h1>
+      <p>Seu diário de treinos</p>
+    </div>
+
+    <div id="login-error" class="error-msg hidden"></div>
+
+    <!-- Login Form -->
+    <form id="login-form">
+      <div class="form-group">
+        <label for="login-email">E-mail</label>
+        <input type="email" id="login-email" placeholder="voce@email.com" autocomplete="email" required />
+      </div>
+      <div class="form-group">
+        <label for="login-pass">Senha</label>
+        <input type="password" id="login-pass" placeholder="••••••" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn-primary">Entrar</button>
+      <div class="login-alt">
+        Não tem conta? <a href="#" id="show-register">Criar conta</a>
+      </div>
+    </form>
+
+    <!-- Register Form -->
+    <form id="register-form" class="hidden">
+      <div class="form-group">
+        <label for="reg-email">E-mail</label>
+        <input type="email" id="reg-email" placeholder="voce@email.com" autocomplete="email" required />
+      </div>
+      <div class="form-group">
+        <label for="reg-pass">Senha</label>
+        <input type="password" id="reg-pass" placeholder="Mín. 6 caracteres" autocomplete="new-password" required minlength="6" />
+      </div>
+      <button type="submit" class="btn-primary">Criar conta</button>
+      <div class="login-alt">
+        Já tem conta? <a href="#" id="show-login">Entrar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ─── App Screen ────────────────────────────────────────── -->
+<div id="app-screen" class="hidden">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-logo">🏋️ GymTracker</div>
+    <div class="header-right">
+      <span id="user-email"></span>
+      <button id="logout-btn" class="btn-ghost btn-sm">Sair</button>
+    </div>
+  </header>
+
+  <!-- Views -->
+  <main class="views-container">
+
+    <!-- Today -->
+    <div id="view-today" class="view">
+      <div class="frequency-banner">
+        <div class="freq-card">
+          <div class="freq-num" id="freq-weekly">–</div>
+          <div class="freq-label">Treinos esta semana</div>
+        </div>
+        <div class="freq-card">
+          <div class="freq-num" id="freq-monthly">–</div>
+          <div class="freq-label">Treinos este mês</div>
+        </div>
+      </div>
+      <div id="today-content">
+        <div class="loading">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div id="view-history" class="view hidden">
+      <div class="view-title">Histórico</div>
+      <div id="history-list">
+        <div class="loading">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="view-progress" class="view hidden">
+      <div class="view-title">Evolução</div>
+      <div class="progress-select-wrap">
+        <select id="progress-exercise-select">
+          <option value="">Selecione um exercício...</option>
+        </select>
+      </div>
+      <div id="chart-container">
+        <div class="empty-state" id="progress-empty">
+          Selecione um exercício acima para ver sua evolução de peso ao longo do tempo.
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="today">
+      <span class="nav-icon">💪</span>
+      <span class="nav-label">Hoje</span>
+    </button>
+    <button class="nav-btn" data-view="history">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Histórico</span>
+    </button>
+    <button class="nav-btn" data-view="progress">
+      <span class="nav-icon">📈</span>
+      <span class="nav-label">Evolução</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- ─── Add Set Modal ─────────────────────────────────────── -->
+<div id="modal-overlay" class="hidden">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div id="modal-title">Adicionar Série</div>
+
+    <div class="modal-field">
+      <label>Peso (kg)</label>
+      <div class="input-stepper">
+        <button type="button" class="btn-weight-dec">−</button>
+        <input type="number" id="set-weight" value="0" min="0" step="0.5" inputmode="decimal" />
+        <button type="button" class="btn-weight-inc">+</button>
+      </div>
+    </div>
+
+    <div class="modal-field">
+      <label>Repetições</label>
+      <div class="input-stepper">
+        <button type="button" class="btn-reps-dec">−</button>
+        <input type="number" id="set-reps" value="12" min="1" step="1" inputmode="numeric" />
+        <button type="button" class="btn-reps-inc">+</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button id="modal-cancel-btn" class="btn-ghost">Cancelar</button>
+      <button id="modal-save-btn" class="btn-primary">Salvar série</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<!-- App (ES Module) -->
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

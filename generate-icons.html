@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head><title>Gerar Ícones – GymTracker</title>
+<style>body{font-family:sans-serif;padding:24px;background:#1a1a2e;color:#fff}
+canvas{display:none} .btn{background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;margin:8px 4px}
+a{color:#a78bfa} p{margin:8px 0;color:#9393a3}</style>
+</head>
+<body>
+<h2>🏋️ Gerador de Ícones – GymTracker</h2>
+<p>Clique nos botões abaixo para baixar os ícones e salve-os na pasta <code>icons/</code></p>
+
+<canvas id="c192" width="192" height="192"></canvas>
+<canvas id="c512" width="512" height="512"></canvas>
+
+<br>
+<button class="btn" onclick="download(192)">Baixar icon-192.png</button>
+<button class="btn" onclick="download(512)">Baixar icon-512.png</button>
+
+<script>
+function drawIcon(size) {
+  const id = size === 192 ? 'c192' : 'c512';
+  const c = document.getElementById(id);
+  const ctx = c.getContext('2d');
+  const r = size / 2;
+
+  // Background
+  const grad = ctx.createRadialGradient(r, r * 0.8, 0, r, r, r);
+  grad.addColorStop(0, '#6d28d9');
+  grad.addColorStop(1, '#1a0a3a');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, size, size, size * 0.22);
+  ctx.fill();
+
+  // Emoji
+  ctx.font = `${size * 0.52}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🏋️', r, r + size * 0.03);
+}
+
+function download(size) {
+  drawIcon(size);
+  const id = size === 192 ? 'c192' : 'c512';
+  const c = document.getElementById(id);
+  const a = document.createElement('a');
+  a.download = `icon-${size}.png`;
+  a.href = c.toDataURL('image/png');
+  a.click();
+}
+
+drawIcon(192);
+drawIcon(512);
+</script>
+</body>
+</html>
