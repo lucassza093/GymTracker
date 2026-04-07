@@ -1,5 +1,5 @@
 import { firebaseConfig } from './firebase-config.js';
-import { EXERCISE_GROUPS, GROUP_ICONS, ALL_GROUPS } from './exercises.js';
+import { EXERCISE_GROUPS, GROUP_ICONS } from './exercises.js';
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
@@ -18,6 +18,7 @@ const db = getFirestore(firebaseApp);
 // ─── State ────────────────────────────────────────────────────
 let currentUser = null;
 let selectedDate = todayStr();
+let selectedGroupTab = null;
 let activeWorkout = null;
 let lastWeights = {};
 let userExercises = null;
@@ -30,6 +31,7 @@ function fmtDate(str) { const [y, m, d] = str.split('-'); return `${d}/${m}/${y}
 function workoutsCol() { return collection(db, 'users', currentUser.uid, 'workouts'); }
 function configDocRef() { return doc(db, 'users', currentUser.uid, 'config', 'exercises'); }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function hasData() { return (activeWorkout?.exercises?.length || 0) + (activeWorkout?.cardio?.length || 0) > 0; }
 
 // ─── User Exercise Config ─────────────────────────────────────
 async function loadUserExercises() {
@@ -46,17 +48,9 @@ async function saveUserExercises() {
   await setDoc(configDocRef(), { groups: userExercises });
 }
 
-function getGroupExercises(group) {
-  return (userExercises || EXERCISE_GROUPS)[group] || [];
-}
-
-function getAllUserGroups() {
-  return Object.keys(userExercises || EXERCISE_GROUPS);
-}
-
-function getAllUserExercises() {
-  return Object.values(userExercises || EXERCISE_GROUPS).flat();
-}
+function getGroupExercises(group) { return (userExercises || EXERCISE_GROUPS)[group] || []; }
+function getAllUserGroups() { return Object.keys(userExercises || EXERCISE_GROUPS); }
+function getAllUserExercises() { return Object.values(userExercises || EXERCISE_GROUPS).flat(); }
 
 // ─── Auth ─────────────────────────────────────────────────────
 onAuthStateChanged(auth, async user => {
@@ -76,7 +70,6 @@ function showLogin() {
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('app-screen').classList.add('hidden');
 }
-
 function showApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app-screen').classList.remove('hidden');
@@ -104,23 +97,13 @@ document.getElementById('register-form').addEventListener('submit', async e => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-document.getElementById('show-register').addEventListener('click', e => {
-  e.preventDefault();
-  document.getElementById('login-form').classList.add('hidden');
-  document.getElementById('register-form').classList.remove('hidden');
-  clearLoginError();
-});
-document.getElementById('show-login').addEventListener('click', e => {
-  e.preventDefault();
-  document.getElementById('register-form').classList.add('hidden');
-  document.getElementById('login-form').classList.remove('hidden');
-  clearLoginError();
-});
+document.getElementById('show-register').addEventListener('click', e => { e.preventDefault(); document.getElementById('login-form').classList.add('hidden'); document.getElementById('register-form').classList.remove('hidden'); clearLoginError(); });
+document.getElementById('show-login').addEventListener('click', e => { e.preventDefault(); document.getElementById('register-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); clearLoginError(); });
 
 function showLoginError(msg) { const el = document.getElementById('login-error'); el.textContent = msg; el.classList.remove('hidden'); }
 function clearLoginError() { const el = document.getElementById('login-error'); el.textContent = ''; el.classList.add('hidden'); }
 function friendlyError(code) {
-  const m = { 'auth/user-not-found': 'E-mail não encontrado.', 'auth/wrong-password': 'Senha incorreta.', 'auth/invalid-email': 'E-mail inválido.', 'auth/email-already-in-use': 'E-mail já cadastrado.', 'auth/weak-password': 'Senha fraca (mín. 6 caracteres).', 'auth/invalid-credential': 'E-mail ou senha incorretos.', 'auth/too-many-requests': 'Muitas tentativas. Tente mais tarde.' };
+  const m = { 'auth/user-not-found': 'E-mail não encontrado.', 'auth/wrong-password': 'Senha incorreta.', 'auth/invalid-email': 'E-mail inválido.', 'auth/email-already-in-use': 'E-mail já cadastrado.', 'auth/weak-password': 'Senha fraca (mín. 6 caracteres).', 'auth/invalid-credential': 'E-mail ou senha incorretos.', 'auth/too-many-requests': 'Muitas tentativas.' };
   return m[code] || 'Erro inesperado. Tente novamente.';
 }
 
@@ -133,10 +116,7 @@ function navigateTo(view) {
   if (view === 'history') loadHistory();
   if (view === 'progress') loadProgressExercises();
 }
-
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => navigateTo(btn.dataset.view));
-});
+document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => navigateTo(btn.dataset.view)));
 
 // ─── Date Picker ──────────────────────────────────────────────
 function renderDatePicker() {
@@ -152,40 +132,32 @@ document.getElementById('date-prev').addEventListener('click', () => {
   const d = new Date(selectedDate + 'T12:00:00');
   d.setDate(d.getDate() - 1);
   selectedDate = d.toISOString().slice(0, 10);
-  renderDatePicker();
-  loadWorkoutForDate(selectedDate);
+  renderDatePicker(); loadWorkoutForDate(selectedDate);
 });
-
 document.getElementById('date-next').addEventListener('click', () => {
   if (selectedDate >= todayStr()) return;
   const d = new Date(selectedDate + 'T12:00:00');
   d.setDate(d.getDate() + 1);
   selectedDate = d.toISOString().slice(0, 10);
-  renderDatePicker();
-  loadWorkoutForDate(selectedDate);
+  renderDatePicker(); loadWorkoutForDate(selectedDate);
 });
-
 document.getElementById('date-display').addEventListener('click', () => {
-  const input = document.getElementById('date-input');
-  input.showPicker ? input.showPicker() : input.click();
+  const i = document.getElementById('date-input');
+  i.showPicker ? i.showPicker() : i.click();
 });
-
 document.getElementById('date-input').addEventListener('change', e => {
   if (!e.target.value || e.target.value > todayStr()) { e.target.value = selectedDate; return; }
   selectedDate = e.target.value;
-  renderDatePicker();
-  loadWorkoutForDate(selectedDate);
+  renderDatePicker(); loadWorkoutForDate(selectedDate);
 });
 
 // ─── Load Workout ─────────────────────────────────────────────
 async function loadWorkoutForDate(date) {
   document.getElementById('today-content').innerHTML = '<div class="loading">Carregando...</div>';
-
   const [snap, weights] = await Promise.all([
     getDoc(doc(workoutsCol(), date)),
     loadLastWeights(date),
   ]);
-
   lastWeights = weights;
 
   if (snap.exists()) {
@@ -196,18 +168,19 @@ async function loadWorkoutForDate(date) {
       exercises: (data.exercises || []).map(ex => ({ groupName: ex.groupName || data.group || '', ...ex })),
       cardio: data.cardio || [],
     };
-    renderWorkout();
   } else {
-    activeWorkout = null;
-    renderGroupSelector();
+    activeWorkout = { id: date, date, groups: [], exercises: [], cardio: [] };
   }
 
+  const groups = getAllUserGroups();
+  if (!selectedGroupTab || !groups.includes(selectedGroupTab)) selectedGroupTab = groups[0];
+
+  renderWorkout();
   loadFrequency();
 }
 
 async function loadLastWeights(excludeDate) {
-  const q = query(workoutsCol(), orderBy('date', 'desc'), limit(60));
-  const snap = await getDocs(q);
+  const snap = await getDocs(query(workoutsCol(), orderBy('date', 'desc'), limit(60)));
   const result = {};
   snap.docs.forEach(d => {
     if (d.id === excludeDate) return;
@@ -221,185 +194,162 @@ async function loadLastWeights(excludeDate) {
   return result;
 }
 
-// ─── Group Selector ───────────────────────────────────────────
-function renderGroupSelector() {
-  const container = document.getElementById('today-content');
-  container.innerHTML = `
-    <div class="section-title">Escolha o grupo muscular</div>
-    <div class="group-grid">
-      ${getAllUserGroups().map(g => `
-        <button class="group-card" data-group="${g}">
-          <span class="group-icon">${GROUP_ICONS[g] || '💪'}</span>
-          <span class="group-name">${g}</span>
-        </button>
-      `).join('')}
-    </div>
-  `;
-  container.querySelectorAll('.group-card').forEach(btn => {
-    btn.addEventListener('click', () => startWorkout(btn.dataset.group));
-  });
-}
-
-async function startWorkout(group) {
-  const exercises = getGroupExercises(group).map(ex => ({ ...ex, groupName: group, sets: [] }));
-  activeWorkout = { id: selectedDate, date: selectedDate, groups: [group], exercises, cardio: [] };
-  await saveWorkout();
-  renderWorkout();
-}
-
 // ─── Render Workout ───────────────────────────────────────────
 function renderWorkout() {
   const container = document.getElementById('today-content');
-  const { groups, exercises, cardio } = activeWorkout;
-  const completedSets = exercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
-  const totalSets = exercises.reduce((n, ex) => n + ex.sets.length, 0);
-
-  const availableToAdd = getAllUserGroups().filter(g => !groups.includes(g));
+  const groups = getAllUserGroups();
+  const totalSets = (activeWorkout.exercises).reduce((n, ex) => n + ex.sets.length, 0);
+  const doneSets = (activeWorkout.exercises).reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
 
   container.innerHTML = `
-    <div class="workout-header">
-      <div class="workout-groups-badges">
-        ${groups.map(g => `<span class="workout-group-badge">${GROUP_ICONS[g] || '💪'} ${g}</span>`).join('')}
+    ${totalSets > 0 ? `<div class="workout-stats-bar">${doneSets}/${totalSets} séries concluídas hoje</div>` : ''}
+    <div class="group-tabs-wrap">
+      <div class="group-tabs">
+        ${groups.map(g => {
+          const gSets = activeWorkout.exercises.filter(e => e.groupName === g).reduce((n, e) => n + e.sets.length, 0);
+          return `<button class="group-tab ${g === selectedGroupTab ? 'active' : ''}" data-group="${g}">
+            ${GROUP_ICONS[g] || '💪'} ${g.split(',')[0].trim()}
+            ${gSets > 0 ? `<span class="tab-badge">${gSets}</span>` : ''}
+          </button>`;
+        }).join('')}
       </div>
-      <span class="workout-stats-mini">${completedSets}/${totalSets} séries</span>
     </div>
-
-    <div id="exercises-list"></div>
-
-    ${availableToAdd.length > 0 ? `
-      <div class="add-group-section">
-        <div class="section-title">Adicionar grupo</div>
-        <div class="add-group-row">
-          ${availableToAdd.map(g => `
-            <button class="btn-add-group" data-group="${g}">${GROUP_ICONS[g] || '💪'} ${g}</button>
-          `).join('')}
-        </div>
+    <div class="exercises-card">
+      <div id="exercises-list"></div>
+    </div>
+    <div class="cardio-footer">
+      <div id="cardio-entries">
+        ${activeWorkout.cardio.map((c, i) => renderCardioChip(c, i)).join('')}
       </div>
-    ` : ''}
-
-    <div class="cardio-section">
-      <div class="cardio-section-header">
-        <div class="section-title">Cardio</div>
-        <button id="add-cardio-btn" class="btn-add-set">+ Cardio</button>
-      </div>
-      <div id="cardio-list">
-        ${cardio.length === 0
-          ? '<div class="no-sets">Nenhum cardio registrado</div>'
-          : cardio.map((c, i) => renderCardioCard(c, i)).join('')}
-      </div>
+      <button id="add-cardio-btn" class="btn-add-cardio">🏃 + Cardio</button>
     </div>
   `;
 
-  renderExercisesList();
-
-  container.querySelectorAll('.btn-add-group').forEach(btn => {
-    btn.addEventListener('click', () => addGroupToWorkout(btn.dataset.group));
+  container.querySelectorAll('.group-tab').forEach(btn => {
+    btn.addEventListener('click', () => { selectedGroupTab = btn.dataset.group; renderWorkout(); });
   });
-
   document.getElementById('add-cardio-btn').addEventListener('click', () => showCardioModal());
-
-  container.querySelectorAll('.btn-delete-cardio').forEach(btn => {
+  container.querySelectorAll('.btn-delete-cardio-chip').forEach(btn => {
     btn.addEventListener('click', async () => {
       activeWorkout.cardio.splice(+btn.dataset.i, 1);
-      await saveWorkout();
+      if (hasData()) await saveWorkout();
       renderWorkout();
     });
   });
+
+  renderExercisesForGroup(selectedGroupTab);
 }
 
-async function addGroupToWorkout(group) {
-  const newExs = getGroupExercises(group).map(ex => ({ ...ex, groupName: group, sets: [] }));
-  activeWorkout.groups.push(group);
-  activeWorkout.exercises.push(...newExs);
-  await saveWorkout();
-  renderWorkout();
-}
-
-// ─── Exercises List ───────────────────────────────────────────
-function renderExercisesList() {
+// ─── Exercise List (tab) ──────────────────────────────────────
+function renderExercisesForGroup(group) {
   const list = document.getElementById('exercises-list');
-  const { exercises, groups } = activeWorkout;
-  const multiGroup = groups.length > 1;
-  let html = '';
-  let lastGroup = null;
+  const exercises = getGroupExercises(group);
 
-  exercises.forEach((ex, exIdx) => {
-    if (multiGroup && ex.groupName !== lastGroup) {
-      html += `<div class="group-section-header">${GROUP_ICONS[ex.groupName] || ''} ${ex.groupName}</div>`;
-      lastGroup = ex.groupName;
-    }
+  list.innerHTML = exercises.map(ex => {
+    const activeEx = activeWorkout.exercises.find(e => e.id === ex.id);
+    const sets = activeEx?.sets || [];
     const lw = lastWeights[ex.id];
-    html += `
-      <div class="exercise-card" id="ex-card-${exIdx}">
-        <div class="exercise-header">
-          <div class="exercise-name-wrap">
+    return `
+      <div class="exercise-row ${sets.length > 0 ? 'has-sets' : ''}">
+        <div class="exercise-row-top">
+          <div class="exercise-row-info">
             <span class="exercise-name">${ex.name}</span>
-            ${lw !== undefined ? `<span class="last-weight">Último: ${lw} kg</span>` : ''}
+            ${lw !== undefined ? `<span class="last-weight">↑${lw} kg</span>` : ''}
           </div>
-          <button class="btn-add-set" data-ex="${exIdx}">+ Série</button>
+          <button class="btn-plus-set" data-id="${ex.id}" data-group="${group}">+</button>
         </div>
-        <div class="sets-list" id="sets-${exIdx}">
-          ${ex.sets.map((s, sIdx) => renderSetRow(exIdx, sIdx, s)).join('')}
-        </div>
-        ${ex.sets.length === 0 ? '<div class="no-sets">Toque em "+ Série" para registrar</div>' : ''}
+        ${sets.length > 0 ? `
+          <div class="set-chips">
+            ${sets.map((s, i) => renderSetChip(ex.id, i, s)).join('')}
+          </div>` : ''}
       </div>
     `;
+  }).join('');
+
+  list.querySelectorAll('.btn-plus-set').forEach(btn => {
+    btn.addEventListener('click', () => openAddSetModal(btn.dataset.id, btn.dataset.group));
   });
-
-  list.innerHTML = html;
-
-  list.querySelectorAll('.btn-add-set').forEach(btn => {
-    btn.addEventListener('click', () => showAddSetModal(+btn.dataset.ex));
-  });
-
-  list.querySelectorAll('.set-check').forEach(cb => {
-    cb.addEventListener('change', async e => {
-      const { ex, set } = e.target.dataset;
-      activeWorkout.exercises[+ex].sets[+set].completed = e.target.checked;
-      e.target.closest('.set-row').classList.toggle('completed', e.target.checked);
+  list.querySelectorAll('.chip-toggle').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ex = activeWorkout.exercises.find(e => e.id === btn.dataset.id);
+      if (!ex) return;
+      ex.sets[+btn.dataset.set].completed = !ex.sets[+btn.dataset.set].completed;
       await saveWorkout();
-      updateWorkoutStats();
+      renderExercisesForGroup(group);
+      updateStatsBar();
     });
   });
-
-  list.querySelectorAll('.btn-delete-set').forEach(btn => {
+  list.querySelectorAll('.chip-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const { ex, set } = btn.dataset;
-      activeWorkout.exercises[+ex].sets.splice(+set, 1);
-      await saveWorkout();
-      renderExercisesList();
-      updateWorkoutStats();
+      const exIdx = activeWorkout.exercises.findIndex(e => e.id === btn.dataset.id);
+      if (exIdx === -1) return;
+      activeWorkout.exercises[exIdx].sets.splice(+btn.dataset.set, 1);
+      if (activeWorkout.exercises[exIdx].sets.length === 0) {
+        activeWorkout.exercises.splice(exIdx, 1);
+        activeWorkout.groups = [...new Set(activeWorkout.exercises.map(e => e.groupName))];
+      }
+      if (hasData()) await saveWorkout();
+      renderExercisesForGroup(group);
+      updateStatsBar();
+      refreshTabBadge(group);
     });
   });
 }
 
-function renderSetRow(exIdx, sIdx, s) {
+function renderSetChip(exId, setIdx, s) {
+  const label = `${s.weight > 0 ? s.weight + ' kg' : 'livre'} × ${s.reps}`;
   return `
-    <div class="set-row ${s.completed ? 'completed' : ''}">
-      <input type="checkbox" class="set-check" data-ex="${exIdx}" data-set="${sIdx}" ${s.completed ? 'checked' : ''}>
-      <span class="set-info">${s.weight > 0 ? s.weight + ' kg' : 'Livre'} × ${s.reps} rep${s.reps !== 1 ? 's' : ''}</span>
-      <button class="btn-delete-set btn-ghost btn-sm" data-ex="${exIdx}" data-set="${sIdx}">✕</button>
+    <div class="set-chip ${s.completed ? 'done' : ''}">
+      <button class="chip-toggle" data-id="${exId}" data-set="${setIdx}">${s.completed ? '✓' : '○'}</button>
+      <span class="chip-label">${label}</span>
+      <button class="chip-del" data-id="${exId}" data-set="${setIdx}">×</button>
     </div>
   `;
 }
 
-function updateWorkoutStats() {
-  const { exercises } = activeWorkout;
-  const done = exercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
-  const total = exercises.reduce((n, ex) => n + ex.sets.length, 0);
-  const el = document.querySelector('.workout-stats-mini');
-  if (el) el.textContent = `${done}/${total} séries`;
+function renderCardioChip(c, i) {
+  const parts = [];
+  if (c.duration) parts.push(c.duration + ' min');
+  if (c.distance) parts.push(c.distance + ' km');
+  if (c.calories) parts.push(c.calories + ' kcal');
+  return `
+    <div class="cardio-chip">
+      <span>🏃 ${c.type}${parts.length ? ' · ' + parts.join(' · ') : ''}</span>
+      <button class="btn-delete-cardio-chip" data-i="${i}">×</button>
+    </div>
+  `;
+}
+
+function updateStatsBar() {
+  const total = activeWorkout.exercises.reduce((n, ex) => n + ex.sets.length, 0);
+  const done = activeWorkout.exercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
+  const el = document.querySelector('.workout-stats-bar');
+  if (el) el.textContent = `${done}/${total} séries concluídas hoje`;
+}
+
+function refreshTabBadge(group) {
+  const gSets = activeWorkout.exercises.filter(e => e.groupName === group).reduce((n, e) => n + e.sets.length, 0);
+  const tab = document.querySelector(`.group-tab[data-group="${group}"]`);
+  if (!tab) return;
+  let badge = tab.querySelector('.tab-badge');
+  if (gSets > 0) {
+    if (!badge) { badge = document.createElement('span'); badge.className = 'tab-badge'; tab.appendChild(badge); }
+    badge.textContent = gSets;
+  } else {
+    badge?.remove();
+  }
 }
 
 // ─── Add Set Modal ────────────────────────────────────────────
-function showAddSetModal(exIdx) {
-  const ex = activeWorkout.exercises[exIdx];
-  const lastSet = ex.sets[ex.sets.length - 1];
-  const lw = lastWeights[ex.id];
-  const defaultWeight = lastSet ? lastSet.weight : (lw !== undefined ? lw : ex.defaultWeight ?? 0);
+function openAddSetModal(exerciseId, groupName) {
+  const exDef = getAllUserExercises().find(e => e.id === exerciseId);
+  const activeEx = activeWorkout.exercises.find(e => e.id === exerciseId);
+  const lastSet = activeEx?.sets[activeEx.sets.length - 1];
+  const lw = lastWeights[exerciseId];
+  const defaultWeight = lastSet ? lastSet.weight : (lw !== undefined ? lw : exDef?.defaultWeight ?? 0);
   const defaultReps = lastSet ? lastSet.reps : 12;
 
-  document.getElementById('modal-title').textContent = ex.name;
+  document.getElementById('modal-title').textContent = exDef?.name || '';
   document.getElementById('set-weight').value = defaultWeight;
   document.getElementById('set-reps').value = defaultReps;
   document.getElementById('modal-overlay').classList.remove('hidden');
@@ -407,12 +357,21 @@ function showAddSetModal(exIdx) {
   document.getElementById('modal-save-btn').onclick = async () => {
     const weight = parseFloat(document.getElementById('set-weight').value) || 0;
     const reps = parseInt(document.getElementById('set-reps').value) || 0;
-    if (reps <= 0) { alert('Informe o número de repetições.'); return; }
-    activeWorkout.exercises[exIdx].sets.push({ weight, reps, completed: false });
+    if (!reps) { alert('Informe as repetições.'); return; }
+
+    let ex = activeWorkout.exercises.find(e => e.id === exerciseId);
+    if (!ex) {
+      ex = { ...exDef, groupName, sets: [] };
+      activeWorkout.exercises.push(ex);
+      if (!activeWorkout.groups.includes(groupName)) activeWorkout.groups.push(groupName);
+    }
+    ex.sets.push({ weight, reps, completed: false });
+
     await saveWorkout();
     closeModal();
-    renderExercisesList();
-    updateWorkoutStats();
+    renderExercisesForGroup(groupName);
+    updateStatsBar();
+    refreshTabBadge(groupName);
   };
 }
 
@@ -429,53 +388,31 @@ document.querySelectorAll('.btn-weight-inc').forEach(btn => btn.addEventListener
   i.value = ((parseFloat(i.value) || 0) + 2.5).toFixed(1).replace(/\.0$/, '');
 }));
 document.querySelectorAll('.btn-reps-dec').forEach(btn => btn.addEventListener('click', () => {
-  const i = document.getElementById('set-reps');
-  i.value = Math.max(1, (parseInt(i.value) || 0) - 1);
+  const i = document.getElementById('set-reps'); i.value = Math.max(1, (parseInt(i.value) || 0) - 1);
 }));
 document.querySelectorAll('.btn-reps-inc').forEach(btn => btn.addEventListener('click', () => {
-  const i = document.getElementById('set-reps');
-  i.value = (parseInt(i.value) || 0) + 1;
+  const i = document.getElementById('set-reps'); i.value = (parseInt(i.value) || 0) + 1;
 }));
 
 // ─── Cardio ───────────────────────────────────────────────────
 const CARDIO_TYPES = ['Esteira', 'Bicicleta', 'Elíptico', 'Remo', 'Escada', 'Pular corda', 'HIIT', 'Natação', 'Caminhada', 'Outro'];
 
-function renderCardioCard(c, i) {
-  const parts = [];
-  if (c.duration) parts.push(`${c.duration} min`);
-  if (c.distance) parts.push(`${c.distance} km`);
-  if (c.calories) parts.push(`${c.calories} kcal`);
-  return `
-    <div class="cardio-card">
-      <div class="cardio-info">
-        <span class="cardio-type">🏃 ${c.type}</span>
-        <span class="cardio-meta">${parts.join(' · ')}${c.notes ? ' — ' + c.notes : ''}</span>
-      </div>
-      <button class="btn-delete-cardio btn-ghost btn-sm" data-i="${i}">✕</button>
-    </div>
-  `;
-}
-
 function showCardioModal() {
   const sel = document.getElementById('cardio-type');
   sel.innerHTML = CARDIO_TYPES.map(t => `<option>${t}</option>`).join('');
-  document.getElementById('cardio-duration').value = '';
-  document.getElementById('cardio-distance').value = '';
-  document.getElementById('cardio-calories').value = '';
-  document.getElementById('cardio-notes').value = '';
+  ['cardio-duration', 'cardio-distance', 'cardio-calories', 'cardio-notes'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('cardio-modal-overlay').classList.remove('hidden');
 
   document.getElementById('cardio-save-btn').onclick = async () => {
     const duration = parseFloat(document.getElementById('cardio-duration').value) || 0;
     if (!duration) { alert('Informe a duração.'); return; }
-    const entry = {
+    activeWorkout.cardio.push({
       type: sel.value,
       duration,
       distance: parseFloat(document.getElementById('cardio-distance').value) || 0,
       calories: parseInt(document.getElementById('cardio-calories').value) || 0,
       notes: document.getElementById('cardio-notes').value.trim(),
-    };
-    activeWorkout.cardio.push(entry);
+    });
     await saveWorkout();
     closeCardioModal();
     renderWorkout();
@@ -532,14 +469,12 @@ async function loadHistory() {
             <div class="history-ex-row">
               <span>${ex.name}</span>
               <span class="history-ex-sets">${ex.sets.map(s => `${s.weight > 0 ? s.weight + 'kg' : 'livre'}×${s.reps}`).join(', ')}</span>
-            </div>
-          `).join('')}
+            </div>`).join('')}
           ${cardio.map(c => `
             <div class="history-ex-row">
               <span>🏃 ${c.type}</span>
               <span class="history-ex-sets">${c.duration ? c.duration + ' min' : ''}${c.distance ? ' · ' + c.distance + ' km' : ''}</span>
-            </div>
-          `).join('')}
+            </div>`).join('')}
         </div>
       </div>
     `;
@@ -553,8 +488,7 @@ function loadProgressExercises() {
   sel.innerHTML = '<option value="">Selecione um exercício...</option>';
   getAllUserExercises().forEach(ex => {
     const opt = document.createElement('option');
-    opt.value = ex.id;
-    opt.textContent = ex.name;
+    opt.value = ex.id; opt.textContent = ex.name;
     if (ex.id === current) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -594,8 +528,7 @@ async function loadProgressChart(exerciseId) {
       ],
     },
     options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
+      responsive: true, interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { labels: { color: '#e5e5e5', font: { size: 12 } } },
         title: { display: true, text: name, color: '#e5e5e5', font: { size: 14, weight: 'bold' } },
@@ -621,11 +554,9 @@ document.getElementById('manage-exercises-btn').addEventListener('click', () => 
   document.getElementById('exercises-overlay').classList.remove('hidden');
   renderExerciseManager();
 });
-
 document.getElementById('exercises-overlay-close').addEventListener('click', () => {
   document.getElementById('exercises-overlay').classList.add('hidden');
 });
-
 document.getElementById('add-new-exercise-btn').addEventListener('click', () => {
   showExerciseEditModal(getAllUserGroups()[0], -1);
 });
@@ -653,12 +584,9 @@ function renderExerciseManager() {
     </div>
   `).join('');
 
-  content.querySelectorAll('.btn-add-to-group').forEach(btn =>
-    btn.addEventListener('click', () => showExerciseEditModal(btn.dataset.group, -1)));
-  content.querySelectorAll('.btn-edit-ex').forEach(btn =>
-    btn.addEventListener('click', () => showExerciseEditModal(btn.dataset.group, +btn.dataset.idx)));
-  content.querySelectorAll('.btn-delete-ex').forEach(btn =>
-    btn.addEventListener('click', () => deleteExercise(btn.dataset.group, +btn.dataset.idx)));
+  content.querySelectorAll('.btn-add-to-group').forEach(btn => btn.addEventListener('click', () => showExerciseEditModal(btn.dataset.group, -1)));
+  content.querySelectorAll('.btn-edit-ex').forEach(btn => btn.addEventListener('click', () => showExerciseEditModal(btn.dataset.group, +btn.dataset.idx)));
+  content.querySelectorAll('.btn-delete-ex').forEach(btn => btn.addEventListener('click', () => deleteExercise(btn.dataset.group, +btn.dataset.idx)));
 }
 
 function showExerciseEditModal(group, idx) {
@@ -667,8 +595,7 @@ function showExerciseEditModal(group, idx) {
   document.getElementById('ex-edit-title').textContent = ex ? 'Editar Exercício' : 'Novo Exercício';
   document.getElementById('ex-edit-name').value = ex?.name || '';
   document.getElementById('ex-edit-weight').value = ex?.defaultWeight ?? '';
-  const groupSel = document.getElementById('ex-edit-group');
-  groupSel.innerHTML = getAllUserGroups().map(g => `<option value="${g}" ${g === group ? 'selected' : ''}>${g}</option>`).join('');
+  document.getElementById('ex-edit-group').innerHTML = getAllUserGroups().map(g => `<option value="${g}" ${g === group ? 'selected' : ''}>${g}</option>`).join('');
   document.getElementById('ex-edit-modal-overlay').classList.remove('hidden');
 }
 
@@ -677,22 +604,14 @@ document.getElementById('ex-edit-save-btn').addEventListener('click', async () =
   const weight = parseFloat(document.getElementById('ex-edit-weight').value) || 0;
   const newGroup = document.getElementById('ex-edit-group').value;
   if (!name) { alert('Informe o nome do exercício.'); return; }
-
   const { group: origGroup, idx } = editingExercise;
-
   if (idx >= 0) {
     const ex = { ...userExercises[origGroup][idx], name, defaultWeight: weight };
-    if (newGroup !== origGroup) {
-      userExercises[origGroup].splice(idx, 1);
-      (userExercises[newGroup] = userExercises[newGroup] || []).push(ex);
-    } else {
-      userExercises[origGroup][idx] = ex;
-    }
+    if (newGroup !== origGroup) { userExercises[origGroup].splice(idx, 1); (userExercises[newGroup] = userExercises[newGroup] || []).push(ex); }
+    else userExercises[origGroup][idx] = ex;
   } else {
-    const newEx = { id: genId(), name, defaultWeight: weight };
-    (userExercises[newGroup] = userExercises[newGroup] || []).push(newEx);
+    (userExercises[newGroup] = userExercises[newGroup] || []).push({ id: genId(), name, defaultWeight: weight });
   }
-
   await saveUserExercises();
   closeExerciseEditModal();
   renderExerciseManager();
@@ -703,8 +622,7 @@ document.getElementById('ex-edit-modal-overlay').addEventListener('click', e => 
 function closeExerciseEditModal() { document.getElementById('ex-edit-modal-overlay').classList.add('hidden'); }
 
 async function deleteExercise(group, idx) {
-  const ex = (userExercises || EXERCISE_GROUPS)[group][idx];
-  if (!confirm(`Excluir "${ex.name}"?`)) return;
+  if (!confirm(`Excluir "${(userExercises || EXERCISE_GROUPS)[group][idx].name}"?`)) return;
   userExercises[group].splice(idx, 1);
   await saveUserExercises();
   renderExerciseManager();
