@@ -282,11 +282,8 @@ function renderExercisesForGroup(group) {
   list.querySelectorAll('.chip-del').forEach(btn => {
     btn.addEventListener('click', async () => {
       const exIdx = activeWorkout.exercises.findIndex(e => e.id === btn.dataset.id);
-      if (exIdx === -1) return;
-      activeWorkout.exercises[exIdx].sets.splice(+btn.dataset.set, 1);
-      if (activeWorkout.exercises[exIdx].sets.length === 0) {
-        activeWorkout.exercises.splice(exIdx, 1);
-        activeWorkout.groups = [...new Set(activeWorkout.exercises.map(e => e.groupName))];
+      if (exIdx !== -1) {
+        activeWorkout.exercises[exIdx].sets.splice(+btn.dataset.set, 1);
       }
       await saveWorkout();
       renderExercisesForGroup(group);
@@ -425,6 +422,10 @@ function closeCardioModal() { document.getElementById('cardio-modal-overlay').cl
 
 // ─── Save ─────────────────────────────────────────────────────
 async function saveWorkout() {
+  // Garante que exercises sem sets não fiquem no array
+  activeWorkout.exercises = activeWorkout.exercises.filter(ex => ex.sets && ex.sets.length > 0);
+  activeWorkout.groups = [...new Set(activeWorkout.exercises.map(e => e.groupName))];
+
   const isEmpty = activeWorkout.exercises.length === 0 && activeWorkout.cardio.length === 0;
   const ref = doc(workoutsCol(), activeWorkout.id);
   if (isEmpty) {
