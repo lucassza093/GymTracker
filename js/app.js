@@ -55,6 +55,7 @@ function getAllUserExercises() { return Object.values(userExercises || EXERCISE_
 // ─── Auth ─────────────────────────────────────────────────────
 onAuthStateChanged(auth, async user => {
   currentUser = user;
+  document.getElementById('splash-screen').classList.add('hidden');
   if (user) {
     await loadUserExercises();
     showApp();
@@ -461,18 +462,22 @@ async function loadHistory() {
   container.innerHTML = snap.docs.map(d => {
     const w = d.data();
     const groups = w.groups || (w.group ? [w.group] : []);
-    const exercises = w.exercises || [];
+    const exercises = (w.exercises || []).filter(ex => ex.sets?.length > 0);
     const cardio = w.cardio || [];
     const totalSets = exercises.reduce((n, ex) => n + ex.sets.length, 0);
     const doneSets = exercises.reduce((n, ex) => n + ex.sets.filter(s => s.completed).length, 0);
-    const exWithSets = exercises.filter(ex => ex.sets.length > 0);
     return `
       <div class="history-card">
-        <div class="history-date">${fmtDate(w.date)}${w.date === todayStr() ? ' <span class="badge-today">Hoje</span>' : ''}</div>
-        <div class="history-group">${groups.map(g => `${GROUP_ICONS[g] || ''} ${g}`).join(' + ')}</div>
-        <div class="history-meta">${exWithSets.length} exercícios · ${doneSets}/${totalSets} séries${cardio.length ? ` · ${cardio.length} cardio` : ''}</div>
+        <div class="history-card-header">
+          <div>
+            <div class="history-date">${fmtDate(w.date)}${w.date === todayStr() ? ' <span class="badge-today">Hoje</span>' : ''}</div>
+            <div class="history-group">${groups.map(g => `${GROUP_ICONS[g] || ''} ${g}`).join(' + ')}</div>
+          </div>
+          <button class="btn-delete-history btn-ghost btn-sm" data-id="${d.id}">🗑️</button>
+        </div>
+        <div class="history-meta">${exercises.length} exercícios · ${doneSets}/${totalSets} séries${cardio.length ? ` · ${cardio.length} cardio` : ''}</div>
         <div class="history-exercises">
-          ${exWithSets.map(ex => `
+          ${exercises.map(ex => `
             <div class="history-ex-row">
               <span>${ex.name}</span>
               <span class="history-ex-sets">${ex.sets.map(s => `${s.weight > 0 ? s.weight + 'kg' : 'livre'}×${s.reps}`).join(', ')}</span>
@@ -486,6 +491,15 @@ async function loadHistory() {
       </div>
     `;
   }).join('');
+
+  container.querySelectorAll('.btn-delete-history').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Apagar este treino do histórico?')) return;
+      await deleteDoc(doc(workoutsCol(), btn.dataset.id));
+      loadHistory();
+      loadFrequency();
+    });
+  });
 }
 
 // ─── Progress ─────────────────────────────────────────────────
