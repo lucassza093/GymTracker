@@ -232,7 +232,7 @@ function renderWorkout() {
   container.querySelectorAll('.btn-delete-cardio-chip').forEach(btn => {
     btn.addEventListener('click', async () => {
       activeWorkout.cardio.splice(+btn.dataset.i, 1);
-      if (hasData()) await saveWorkout();
+      await saveWorkout();
       renderWorkout();
     });
   });
@@ -288,7 +288,7 @@ function renderExercisesForGroup(group) {
         activeWorkout.exercises.splice(exIdx, 1);
         activeWorkout.groups = [...new Set(activeWorkout.exercises.map(e => e.groupName))];
       }
-      if (hasData()) await saveWorkout();
+      await saveWorkout();
       renderExercisesForGroup(group);
       updateStatsBar();
       refreshTabBadge(group);
