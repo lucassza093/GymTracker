@@ -7,7 +7,7 @@ import {
   signOut, onAuthStateChanged,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
-  getFirestore, collection, doc, setDoc, getDoc, getDocs,
+  getFirestore, collection, doc, setDoc, deleteDoc, getDoc, getDocs,
   query, orderBy, limit, Timestamp,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -425,13 +425,19 @@ function closeCardioModal() { document.getElementById('cardio-modal-overlay').cl
 
 // ─── Save ─────────────────────────────────────────────────────
 async function saveWorkout() {
-  await setDoc(doc(workoutsCol(), activeWorkout.id), {
-    date: activeWorkout.date,
-    groups: activeWorkout.groups,
-    exercises: activeWorkout.exercises,
-    cardio: activeWorkout.cardio,
-    updatedAt: Timestamp.now(),
-  });
+  const isEmpty = activeWorkout.exercises.length === 0 && activeWorkout.cardio.length === 0;
+  const ref = doc(workoutsCol(), activeWorkout.id);
+  if (isEmpty) {
+    await deleteDoc(ref);
+  } else {
+    await setDoc(ref, {
+      date: activeWorkout.date,
+      groups: activeWorkout.groups,
+      exercises: activeWorkout.exercises,
+      cardio: activeWorkout.cardio,
+      updatedAt: Timestamp.now(),
+    });
+  }
 }
 
 // ─── Frequency ────────────────────────────────────────────────
